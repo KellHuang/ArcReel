@@ -105,6 +105,12 @@ class TestScriptResolver:
         # 游离 video_units 不抢走 storyboard 脚本的判别。
         assert resolve_script_kind({"video_units": [], "segments": [], "content_mode": "narration"}) == "segments"
 
+    def test_step1_floating_video_units_hijack_guard_without_content_mode(self):
+        # 游离 video_units + segments 并存但无 content_mode：step1 守卫仍挡住 video_units 抢判，
+        # 缺 content_mode 落键存在性阶梯（step4/终兜底）返回 segments。覆盖历史脏数据 storyboard
+        # 脚本（被误塞游离 video_units、无 content_mode 戳）不被误判为 reference 的取证路径。
+        assert resolve_script_kind({"video_units": [], "segments": []}) == "segments"
+
     def test_step2_content_mode_authority(self):
         assert resolve_script_kind({"content_mode": "ad"}) == "shots"
         assert resolve_script_kind({"content_mode": "drama"}) == "scenes"
@@ -113,6 +119,12 @@ class TestScriptResolver:
     def test_step3_narration_falls_back_to_scenes_key(self):
         # content_mode=narration 但数据落 scenes 键（无 segments）→ 回退 scenes。
         assert resolve_script_kind({"content_mode": "narration", "scenes": []}) == "scenes"
+
+    def test_generation_mode_ignored_data_shape_wins(self):
+        # partial migration 中间态：generation_mode 已改 reference_video 但数据仍在
+        # segments——取证解析不读 generation_mode，按数据形状返回 segments，编辑能力不丢失。
+        script = {"content_mode": "narration", "generation_mode": "reference_video", "segments": []}
+        assert resolve_script_kind(script) == "segments"
 
     def test_step4_key_existence_inference_when_content_mode_absent(self):
         assert resolve_script_kind({"scenes": []}) == "scenes"
